@@ -7,9 +7,6 @@ use App\Models\Medicine;
 
 class MedicineSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $medicines = [
@@ -23,6 +20,7 @@ class MedicineSeeder extends Seeder
             'ALLOPURINOL 300MG TABLET',
             'AMIKACIN 250MG VIAL',
             'AMIKACIN 500MG VIAL',
+            // continue full list...
         ];
 
         foreach ($medicines as $name) {
