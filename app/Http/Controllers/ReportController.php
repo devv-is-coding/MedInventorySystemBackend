@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\StockTransaction;
+use App\Models\Medicine;
+use App\Models\MonthlySummary;
+use Carbon\Carbon;
 
 class ReportController extends Controller
 {
