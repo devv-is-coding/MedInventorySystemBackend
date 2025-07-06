@@ -9,13 +9,8 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TransactionTypeController;
 
 Route::post('/login', [AuthController::class, 'login']);
-    // Medicine routes
-        Route::apiResource('medicines', MedicineController::class);
 
-        // Transaction routes
-        Route::apiResource('stock-transactions', StockTransactionController::class);
-
-Route::group(['middleware'=>['auth:sunctum']], 
+Route::group(['middleware'=>['auth:sanctum']], 
 function () {
     Route::get('/profile', [AuthController::class, 'profile']);
         Route::post('/logout', [AuthController::class, 'logout']);
