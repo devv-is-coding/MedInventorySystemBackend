@@ -21,10 +21,14 @@ return new class extends Migration
 
         DB::table('transaction_types')->insert([
             ['id' => 1, 'code' => 'FORWARD', 'label' => 'Monthly Forward', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 2, 'code' => 'RETURN', 'label' => 'Return Meds', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'code' => 'NEW_ADDED', 'label' => 'New Added Meds', 'created_at' => now(), 'updated_at' => now()],
             ['id' => 3, 'code' => 'DONATION', 'label' => 'Donation Meds', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 4, 'code' => 'NEW_ADDED', 'label' => 'New Added Meds', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 5, 'code' => 'DISPENSE', 'label' => 'Dispensed', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 4, 'code' => 'RETURN', 'label' => 'Return Meds', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 5, 'code' => 'CHARGES', 'label' => 'Charges (In-Patient)', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 6, 'code' => 'WARD_ISSUANCE', 'label' => 'Ward Issuance', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 7, 'code' => 'OTC', 'label' => 'OTC (Outpatient)', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 8, 'code' => 'DAMAGES', 'label' => 'Damaged Meds', 'created_at' => now(), 'updated_at' => now()],
+
         ]);
     }
 

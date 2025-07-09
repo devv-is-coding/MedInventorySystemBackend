@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Medicine extends Model
 {
-    use HasFactory;
+    use SoftDeletes, HasFactory;
 
     protected $fillable = [
         'name',
@@ -28,19 +29,22 @@ class Medicine extends Model
         return $this->hasMany(MonthlySummary::class);
     }
 
-    public function getCurrentStockAttribute()
-    {
-        $transactions = $this->stockTransactions;
-        $currentStock = 0;
+        public function getCurrentStockAttribute()
+{
+    $transactions = $this->stockTransactions;
+    $currentStock = 0;
 
-        foreach ($transactions as $transaction) {
-            if ($transaction->txn_type_id == 5) { // DISPENSE
-                $currentStock -= $transaction->quantity;
-            } else {
-                $currentStock += $transaction->quantity;
-            }
+    $addTypes = [2, 3, 4]; // RDD = Return, Donation, Direct Add
+
+    foreach ($transactions as $transaction) {
+        if (in_array($transaction->txn_type_id, $addTypes)) {
+            $currentStock += $transaction->quantity;
+        } else {
+            $currentStock -= $transaction->quantity;
         }
-
-        return max(0, $currentStock);
     }
+
+    return max(0, $currentStock);
 }
+
+    }
