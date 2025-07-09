@@ -10,27 +10,28 @@ use Carbon\Carbon;
 
 class ReportController extends Controller
 {
-    public function dailyReport(Request $request)
-    {
-        $data = $request->validate([
-            'date' => 'required|date',
-        ]);
+   public function dailyReport(Request $request)
+{
+    $validated = $request->validate([
+        'date' => 'required|date',
+    ]);
 
-        $transactions = StockTransaction::with(['medicine', 'transactionType'])
-            ->whereDate('txn_date', $data['date'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+    $transactions = StockTransaction::with(['medicine', 'transactionType'])
+        ->whereDate('txn_date', $validated['date'])
+        ->orderBy('created_at', 'desc')
+        ->get();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Daily report retrieved successfully',
-            'data' => $transactions
-        ]);
-    }
+    return response()->json([
+        'status' => true,
+        'message' => 'Daily report retrieved successfully',
+        'data' => $transactions,
+    ]);
+}
+
 
     public function monthlyReport(Request $request)
     {
-        $data = $request->validate([
+        $validated = $request->validate([
             'year' => 'required|integer',
             'month' => 'required|integer|min:1|max:12',
         ]);
@@ -40,9 +41,16 @@ class ReportController extends Controller
 
         foreach ($medicines as $medicine) {
             $transactions = StockTransaction::where('medicine_id', $medicine->id)
-                ->whereYear('txn_date', $data['year'])
-                ->whereMonth('txn_date', $data['month'])
+                ->whereYear('txn_date', $validated['year'])
+                ->whereMonth('txn_date', $validated['month'])
                 ->get();
+
+            // Type ID constants from migration:
+            $FORWARD = 1;
+            $NEW_ADDED = 2;
+            $DONATION = 3;
+            $RETURN = 4;
+            $DISPENSE_IDS = [5, 6, 7, 8]; // CHARGES, WARD_ISSUANCE, OTC, DAMAGES
 
             $openingStock = 0;
             $totalReturn = 0;
@@ -50,23 +58,17 @@ class ReportController extends Controller
             $totalNewAdded = 0;
             $totalDispensed = 0;
 
-            foreach ($transactions as $transaction) {
-                switch ($transaction->txn_type_id) {
-                    case 1: // FORWARD
-                        $openingStock += $transaction->quantity;
-                        break;
-                    case 2: // RETURN
-                        $totalReturn += $transaction->quantity;
-                        break;
-                    case 3: // DONATION
-                        $totalDonation += $transaction->quantity;
-                        break;
-                    case 4: // NEW_ADDED
-                        $totalNewAdded += $transaction->quantity;
-                        break;
-                    case 5: // DISPENSE
-                        $totalDispensed += $transaction->quantity;
-                        break;
+            foreach ($transactions as $txn) {
+                if ($txn->txn_type_id == $FORWARD) {
+                    $openingStock += $txn->quantity;
+                } elseif ($txn->txn_type_id == $RETURN) {
+                    $totalReturn += $txn->quantity;
+                } elseif ($txn->txn_type_id == $DONATION) {
+                    $totalDonation += $txn->quantity;
+                } elseif ($txn->txn_type_id == $NEW_ADDED) {
+                    $totalNewAdded += $txn->quantity;
+                } elseif (in_array($txn->txn_type_id, $DISPENSE_IDS)) {
+                    $totalDispensed += $txn->quantity;
                 }
             }
 
@@ -75,8 +77,8 @@ class ReportController extends Controller
             $reports[] = [
                 'medicine_id' => $medicine->id,
                 'medicine' => $medicine,
-                'year' => $data['year'],
-                'month' => $data['month'],
+                'year' => $validated['year'],
+                'month' => $validated['month'],
                 'opening_stock' => $openingStock,
                 'total_return' => $totalReturn,
                 'total_donation' => $totalDonation,
@@ -89,55 +91,54 @@ class ReportController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Monthly report retrieved successfully',
-            'data' => $reports
+            'data' => $reports,
         ]);
     }
 
     public function performMonthClose(Request $request)
     {
-        $data = $request->validate([
+        $validated = $request->validate([
             'year' => 'required|integer',
             'month' => 'required|integer|min:1|max:12',
         ]);
 
-        // Get monthly report data
-        $monthlyReportRequest = new Request(['year' => $data['year'], 'month' => $data['month']]);
-        $monthlyReports = $this->monthlyReport($monthlyReportRequest)->getData()->data;
+        $monthlyReports = $this->monthlyReport(new Request($validated))->getData(true)['data'];
 
-        // Calculate next month
-        $nextMonth = $data['month'] == 12 ? 1 : $data['month'] + 1;
-        $nextYear = $data['month'] == 12 ? $data['year'] + 1 : $data['year'];
-        $nextMonthDate = Carbon::create($nextYear, $nextMonth, 1)->format('Y-m-d');
+        // Calculate next month and year
+        $current = Carbon::create($validated['year'], $validated['month'], 1);
+        $next = $current->copy()->addMonth();
+        $nextDate = $next->toDateString();
 
+        $FORWARD = 1;
         $forwardCount = 0;
 
         foreach ($monthlyReports as $report) {
-            if ($report->closing_stock > 0) {
+            if ($report['closing_stock'] > 0) {
                 StockTransaction::create([
-                    'medicine_id' => $report->medicine_id,
-                    'txn_type_id' => 1, // FORWARD
-                    'txn_date' => $nextMonthDate,
-                    'quantity' => $report->closing_stock,
-                    'remarks' => "Forward from {$data['year']}-" . str_pad($data['month'], 2, '0', STR_PAD_LEFT),
+                    'medicine_id' => $report['medicine_id'],
+                    'txn_type_id' => $FORWARD,
+                    'txn_date' => $nextDate,
+                    'quantity' => $report['closing_stock'],
+                    'remarks' => "Forward from {$validated['year']}-" . str_pad($validated['month'], 2, '0', STR_PAD_LEFT),
                     'created_by' => $request->user()->id,
                 ]);
                 $forwardCount++;
             }
 
-            // Save monthly summary
+            // Store monthly summary
             MonthlySummary::updateOrCreate(
                 [
-                    'medicine_id' => $report->medicine_id,
-                    'year' => $data['year'],
-                    'month' => $data['month'],
+                    'medicine_id' => $report['medicine_id'],
+                    'year' => $validated['year'],
+                    'month' => $validated['month'],
                 ],
                 [
-                    'opening_stock' => $report->opening_stock,
-                    'total_return' => $report->total_return,
-                    'total_donation' => $report->total_donation,
-                    'total_new_added' => $report->total_new_added,
-                    'total_dispensed' => $report->total_dispensed,
-                    'closing_stock' => $report->closing_stock,
+                    'opening_stock' => $report['opening_stock'],
+                    'total_return' => $report['total_return'],
+                    'total_donation' => $report['total_donation'],
+                    'total_new_added' => $report['total_new_added'],
+                    'total_dispensed' => $report['total_dispensed'],
+                    'closing_stock' => $report['closing_stock'],
                 ]
             );
         }
@@ -145,7 +146,7 @@ class ReportController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Month closed successfully',
-            'forward_transactions_created' => $forwardCount
+            'forward_transactions_created' => $forwardCount,
         ]);
     }
 }
